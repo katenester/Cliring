@@ -1,0 +1,786 @@
+openapi: 3.0.3
+info:
+  title: API Модуля Клиринга
+  description: API для управления сделками, заказами, денежными расчетами, клиринговыми транзакциями, платежными транзакциями, графиками платежей и персональными кошельками клиентов. Все запросы требуют параметр client_id в качестве query-параметра.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081/v1
+    description: Основной сервер
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: ERR_INVALID_INPUT
+            message:
+              type: string
+              example: Указан неверный client_id
+            details:
+              type: object
+      required:
+        - error
+    Deal:
+      type: object
+      properties:
+        deal_id:
+          type: integer
+          example: 1
+        is_completed:
+          type: boolean
+          example: false
+        created_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+      required:
+        - deal_id
+        - is_completed
+        - created_at
+        - updated_at
+    DealCreate:
+      type: object
+      properties:
+        is_completed:
+          type: boolean
+          example: false
+    Order:
+      type: object
+      properties:
+        order_id:
+          type: integer
+          example: 1
+        deal_id:
+          type: integer
+          example: 1
+        amount:
+          type: number
+          format: float
+          example: 100.00
+        status:
+          type: string
+          enum: [pending, executed, cancelled]
+          example: pending
+        created_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        client_id:
+          type: integer
+          example: 1
+        counterparty_id:
+          type: integer
+          example: 2
+        need_and_orders_id:
+          type: integer
+          example: 123
+          nullable: true
+      required:
+        - order_id
+        - deal_id
+        - amount
+        - status
+        - created_at
+        - updated_at
+        - client_id
+        - counterparty_id
+    OrderCreate:
+      type: object
+      properties:
+        deal_id:
+          type: integer
+          example: 1
+        amount:
+          type: number
+          format: float
+          example: 100.00
+        status:
+          type: string
+          enum: [pending, executed, cancelled]
+          example: pending
+        counterparty_id:
+          type: integer
+          example: 2
+        need_and_orders_id:
+          type: integer
+          example: 123
+          nullable: true
+      required:
+        - deal_id
+        - amount
+        - counterparty_id
+    MonetarySettlement:
+      type: object
+      properties:
+        monetary_settlement_id:
+          type: integer
+          example: 1
+        deal_id:
+          type: integer
+          example: 1
+          nullable: true
+        amount:
+          type: number
+          format: float
+          example: 120.00
+        status:
+          type: string
+          enum: [pending, executed, cancelled]
+          example: pending
+        created_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        payment_method:
+          type: string
+          example: card
+          nullable: true
+        client_id:
+          type: integer
+          example: 1
+      required:
+        - monetary_settlement_id
+        - amount
+        - status
+        - created_at
+        - updated_at
+        - client_id
+    MonetarySettlementCreate:
+      type: object
+      properties:
+        deal_id:
+          type: integer
+          example: 1
+          nullable: true
+        amount:
+          type: number
+          format: float
+          example: 120.00
+        status:
+          type: string
+          enum: [pending, executed, cancelled]
+          example: pending
+        payment_method:
+          type: string
+          example: card
+          nullable: true
+      required:
+        - amount
+    ClearingTransaction:
+      type: object
+      properties:
+        clearing_transaction_id:
+          type: integer
+          example: 1
+        order_id:
+          type: integer
+          example: 1
+          nullable: true
+        monetary_settlement_id:
+          type: integer
+          example: 1
+          nullable: true
+        amount:
+          type: number
+          format: float
+          example: 100.00
+        status:
+          type: string
+          enum: [pending, completed]
+          example: pending
+        created_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+      required:
+        - clearing_transaction_id
+        - amount
+        - status
+        - created_at
+        - updated_at
+    ClearingTransactionCreate:
+      type: object
+      properties:
+        order_id:
+          type: integer
+          example: 1
+          nullable: true
+        monetary_settlement_id:
+          type: integer
+          example: 1
+          nullable: true
+        amount:
+          type: number
+          format: float
+          example: 100.00
+        status:
+          type: string
+          enum: [pending, completed]
+          example: pending
+      required:
+        - amount
+    PayTransaction:
+      type: object
+      properties:
+        transaction_id:
+          type: integer
+          example: 1
+        monetary_settlement_id:
+          type: integer
+          example: 1
+        amount:
+          type: number
+          format: float
+          example: 120.00
+        bank_account:
+          type: string
+          example: "1234567890"
+        payment_method:
+          type: string
+          enum: [card, bank_transfer, wallet]
+          example: card
+        status:
+          type: string
+          enum: [pending, completed, cancelled]
+          example: pending
+        created_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+      required:
+        - transaction_id
+        - monetary_settlement_id
+        - amount
+        - bank_account
+        - payment_method
+        - status
+        - created_at
+        - updated_at
+    PayTransactionCreate:
+      type: object
+      properties:
+        monetary_settlement_id:
+          type: integer
+          example: 1
+        amount:
+          type: number
+          format: float
+          example: 120.00
+        bank_account:
+          type: string
+          example: "1234567890"
+        payment_method:
+          type: string
+          enum: [card, bank_transfer, wallet]
+          example: card
+        status:
+          type: string
+          enum: [pending, completed, cancelled]
+          example: pending
+      required:
+        - monetary_settlement_id
+        - amount
+        - bank_account
+        - payment_method
+    PaymentSchedule:
+      type: object
+      properties:
+        schedule_id:
+          type: integer
+          example: 1
+        monetary_settlement_id:
+          type: integer
+          example: 1
+        due_date:
+          type: string
+          format: date
+          example: 2025-06-01
+        amount:
+          type: number
+          format: float
+          example: 40.00
+        status:
+          type: string
+          enum: [planned, paid, overdue]
+          example: planned
+        created_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+      required:
+        - schedule_id
+        - monetary_settlement_id
+        - due_date
+        - amount
+        - status
+        - created_at
+        - updated_at
+    PaymentScheduleCreate:
+      type: object
+      properties:
+        monetary_settlement_id:
+          type: integer
+          example: 1
+        due_date:
+          type: string
+          format: date
+          example: 2025-06-01
+        amount:
+          type: number
+          format: float
+          example: 40.00
+        status:
+          type: string
+          enum: [planned, paid, overdue]
+          example: planned
+      required:
+        - monetary_settlement_id
+        - due_date
+        - amount
+    PersonalWallet:
+      type: object
+      properties:
+        wallet_id:
+          type: integer
+          example: 1
+        balance:
+          type: number
+          format: float
+          example: 500.00
+        contract_id:
+          type: integer
+          example: 123
+        status:
+          type: string
+          enum: [active, frozen, closed]
+          example: active
+        created_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2025-05-01T10:00:00Z
+        client_id:
+          type: integer
+          example: 1
+      required:
+        - wallet_id
+        - balance
+        - contract_id
+        - status
+        - created_at
+        - updated_at
+        - client_id
+    PersonalWalletCreate:
+      type: object
+      properties:
+        balance:
+          type: number
+          format: float
+          example: 0.00
+        contract_id:
+          type: integer
+          example: 123
+        status:
+          type: string
+          enum: [active, frozen, closed]
+          example: active
+      required:
+        - balance
+        - contract_id
+    WalletOperation:
+      type: object
+      properties:
+        amount:
+          type: number
+          format: float
+          example: 100.00
+      required:
+        - amount
+paths:
+  /deals:
+    post:
+      summary: Создать новую сделку
+      description: Создает новую сделку для указанного клиента.
+      operationId: createDeal
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DealCreate'
+      responses:
+        '201':
+          description: Сделка создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deal'
+        '400':
+          description: Неверный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /deals/{deal_id}:
+    put:
+      summary: Обновить сделку
+      description: Обновляет данные конкретной сделки по её ID для указанного клиента.
+      operationId: updateDeal
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deal_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DealCreate'
+      responses:
+        '200':
+          description: Сделка обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deal'
+        '400':
+          description: Неверный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Сделка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Удалить сделку
+      description: Удаляет сделку по её ID для указанного клиента.
+      operationId: deleteDeal
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deal_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Сделка удалена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Сделка удалена
+        '404':
+          description: Сделка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders:
+    get:
+      summary: Получить список заказов
+      description: Возвращает постраничный список всех заказов для указанного клиента.
+      operationId: listOrders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  total:
+                    type: integer
+                    example: 100
+        '400':
+          description: Неверный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Создать новый заказ
+      description: Создает новый заказ для указанного клиента.
+      operationId: createOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreate'
+      responses:
+        '201':
+          description: Заказ создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Неверный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /monetary-settlements:
+    get:
+      summary: Получить список денежных расчетов
+      description: Возвращает постраничный список всех денежных расчетов для указанного клиента.
+      operationId: listMonetarySettlements
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settlements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MonetarySettlement'
+                  total:
+                    type: integer
+                    example: 100
+        '400':
+          description: Неверный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Изменить денежный расчёт / способ оплаты
+      description: Создает новый денежный расчет для указанного клиента.
+      operationId: createMonetarySettlement
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MonetarySettlementCreate'
+      responses:
+        '201':
+          description: Денежный расчет создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonetarySettlement'
+        '400':
+          description: Неверный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /clearing-transactions:
+    get:
+      summary: Получить список клиринговых транзакций
+      description: Возвращает постраничный список всех клиринговых транзакций для указанного клиента.
+      operationId: listClearingTransactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClearingTransaction'
+                  total:
+                    type: integer
+                    example: 100
+        '400':
+          description: Неверный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

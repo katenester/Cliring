@@ -1,0 +1,29 @@
+services:
+  cliring:
+    build: ./
+    ports:
+      - '8081:8081'
+    command:
+      - go
+      - run
+      - ./cmd/cliring/main.go
+    environment:
+      DNS: "postgres://postgres:hFAClzgcwH5QNmEja8CdzwVDMCnxxm@localhost:5432/cliring?sslmode=disable"
+    networks:
+      - cliring-network
+  db:
+    restart: always
+    image: postgres:latest
+    volumes:
+      - ./.database/postgres/data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: hFAClzgcwH5QNmEja8CdzwVDMCnxxm
+      POSTGRES_USER: postgres
+      POSTGRES_DB: cliring
+    ports:
+      - "5440:5432"
+    networks:
+      - cliring-network
+networks:
+  cliring-network:
+    external: true
