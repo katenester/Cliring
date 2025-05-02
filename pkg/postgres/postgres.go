@@ -16,14 +16,14 @@ var (
 )
 
 type Postgres struct {
-	conn   *pgx.Conn
+	Conn   *pgx.Conn
 	config config.Postgres
 }
 
 // New возвращает новый экземпляр Postgres, связанный с заданным именем источника данных.
 func New(cfg *config.Config) *Postgres {
 	db := &Postgres{
-		conn:   nil,
+		Conn:   nil,
 		config: cfg.Postgres,
 	}
 	return db
@@ -37,7 +37,7 @@ func (db *Postgres) Open(ctx context.Context) (err error) {
 	}
 
 	// Подключение соединения
-	db.conn, err = pgx.Connect(ctx, db.config.DSN)
+	db.Conn, err = pgx.Connect(ctx, db.config.DSN)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
@@ -55,7 +55,7 @@ func (db *Postgres) Open(ctx context.Context) (err error) {
 // migrate- применяет миграции к базе данных с использованием tern.
 func (db *Postgres) migrate(ctx context.Context) error {
 	// Создаем мигрант tern
-	migrator, err := migrate.NewMigrator(ctx, db.conn, db.config.MigrationVersionTable)
+	migrator, err := migrate.NewMigrator(ctx, db.Conn, db.config.MigrationVersionTable)
 	if err != nil {
 		return fmt.Errorf("unable to initialize migrator: %w", err)
 	}
@@ -78,12 +78,12 @@ func (db *Postgres) migrate(ctx context.Context) error {
 
 // Close закрывает соединение с базой данных.
 func (db *Postgres) Close(ctx context.Context) error {
-	if db.conn != nil {
-		err := db.conn.Close(ctx)
+	if db.Conn != nil {
+		err := db.Conn.Close(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to close connection: %w", err)
 		}
-		db.conn = nil
+		db.Conn = nil
 	}
 	return nil
 }

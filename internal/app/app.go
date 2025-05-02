@@ -2,6 +2,9 @@ package app
 
 import (
 	"cliring/config"
+	"cliring/internal/repository"
+	"cliring/internal/service"
+	"cliring/internal/transport"
 	"cliring/pkg/postgres"
 	"context"
 	"github.com/joho/godotenv"

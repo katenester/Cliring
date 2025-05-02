@@ -132,33 +132,9 @@ COMMENT ON COLUMN payment_schedules.status IS 'Статус: planned, paid, over
 COMMENT ON COLUMN payment_schedules.created_at IS 'Дата и время создания';
 COMMENT ON COLUMN payment_schedules.updated_at IS 'Дата и время последнего обновления';
 
--- Создание таблицы personal_wallets
-CREATE TABLE personal_wallets (
-                                  wallet_id INTEGER PRIMARY KEY NOT NULL,
-                                  balance BYTEA NOT NULL,
-                                  contract_id INTEGER NOT NULL,
-                                  status CHARACTER VARYING(20) DEFAULT 'active',
-                                  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                  client_id INTEGER NOT NULL
-);
-
-CREATE INDEX idx_personal_wallets_status ON personal_wallets USING BTREE (status);
-CREATE UNIQUE INDEX personal_wallets_pk ON personal_wallets USING BTREE (client_id);
-
-COMMENT ON TABLE personal_wallets IS 'Таблица для управления виртуальными кошельками клиентов';
-COMMENT ON COLUMN personal_wallets.wallet_id IS 'Уникальный идентификатор кошелька';
-COMMENT ON COLUMN personal_wallets.balance IS 'Текущий баланс кошелька';
-COMMENT ON COLUMN personal_wallets.contract_id IS 'Ссылка на договор-основание (от сервиса Document_id)';
-COMMENT ON COLUMN personal_wallets.status IS 'Текущий статус кошелька (active, frozen, closed)';
-COMMENT ON COLUMN personal_wallets.created_at IS 'Дата и время создания кошелька';
-COMMENT ON COLUMN personal_wallets.updated_at IS 'Дата и время последнего обновления кошелька';
-COMMENT ON COLUMN personal_wallets.client_id IS 'id Клиента кошелька';
-
 ---- create above / drop below ----
 
 -- Откат: удаление таблиц в обратном порядке
-DROP TABLE personal_wallets;
 DROP TABLE payment_schedules;
 DROP TABLE pay_transactions;
 DROP TABLE clearing_transactions;

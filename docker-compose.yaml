@@ -2,13 +2,13 @@ services:
   cliring:
     build: ./
     ports:
-      - '8081:8081'
+      - '8080:8080'
     command:
       - go
       - run
       - ./cmd/cliring/main.go
     environment:
-      DNS: "postgres://postgres:hFAClzgcwH5QNmEja8CdzwVDMCnxxm@localhost:5432/cliring?sslmode=disable"
+      DNS: "postgres://postgres:hFAClzgcwH5QNmEja8CdzwVDMCnxxm@db:5432/cliring?sslmode=disable"
     networks:
       - cliring-network
   db:
@@ -26,4 +26,4 @@ services:
       - cliring-network
 networks:
   cliring-network:
-    external: true
+    driver: bridge
