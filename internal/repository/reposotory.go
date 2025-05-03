@@ -185,6 +185,51 @@ func (r *Repository) ListOrders(ctx context.Context, clientID int) ([]*domain.Or
 	return orders, total, nil
 }
 
+// ListOrders retrieves a paginated list of orders for a client.
+func (r *Repository) ListOrdersByDeals(ctx context.Context, dealID int) ([]*domain.Order, error) {
+	// Retrieve orders
+	query := `
+		SELECT o.order_id, o.deal_id, o.order_type_id, o.amount, o.status, o.created_at, o.updated_at, 
+			o.need_and_orders_id, o.bank_id
+		FROM orders o
+		JOIN deals d ON o.deal_id = d.deal_id
+		WHERE d.deal_id = $1`
+
+	rows, err := r.db.QueryContext(ctx, query, dealID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query orders: %w", err)
+	}
+	defer rows.Close()
+
+	var orders []*domain.Order
+	for rows.Next() {
+		var order domain.Order
+		var needAndOrdersID, bankID sql.NullInt64
+		err := rows.Scan(
+			&order.OrderID, &order.DealID, &order.OrderTypeID, &order.Amount, &order.Status,
+			&order.CreatedAt, &order.UpdatedAt, &needAndOrdersID, &bankID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan order: %w", err)
+		}
+		if needAndOrdersID.Valid {
+			needAndOrdersIDInt := int(needAndOrdersID.Int64)
+			order.NeedAndOrdersID = &needAndOrdersIDInt
+		}
+		if bankID.Valid {
+			bankIDInt := int(bankID.Int64)
+			order.BankID = &bankIDInt
+		}
+		orders = append(orders, &order)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating orders: %w", err)
+	}
+
+	return orders, nil
+}
+
 // CreateOrder creates a new order in the database.
 func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order) (*domain.Order, error) {
 	query := `
