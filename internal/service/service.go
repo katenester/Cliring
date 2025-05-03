@@ -1,12 +1,12 @@
 package service
 
 import (
+	"cliring/internal/repository"
 	"context"
 	"errors"
 	"fmt"
 
 	"cliring/internal/domain"
-	"cliring/internal/repository"
 )
 
 // Errors returned by the service layer.
@@ -26,9 +26,20 @@ func NewService(repo *repository.Repository) *Service {
 	return &Service{repo: repo}
 }
 
-// CreateDeal creates a new deal for the specified client.
-func (s *Service) CreateDeal(ctx context.Context) (*domain.Deal, error) {
-	createdDeal, err := s.repo.CreateDeal(ctx)
+// CreateDeal creates a new deal.
+func (s *Service) CreateDeal(ctx context.Context, req domain.Deal) (*domain.Deal, error) {
+	// Validate input
+	if req.DealershipID <= 0 {
+		return nil, fmt.Errorf("invalid dealership_id: %w", ErrInvalidInput)
+	}
+	if req.ManagerID <= 0 {
+		return nil, fmt.Errorf("invalid manager_id: %w", ErrInvalidInput)
+	}
+	if req.ClientID <= 0 {
+		return nil, fmt.Errorf("invalid client_id: %w", ErrInvalidInput)
+	}
+
+	createdDeal, err := s.repo.CreateDeal(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deal: %w", err)
 	}
@@ -37,7 +48,7 @@ func (s *Service) CreateDeal(ctx context.Context) (*domain.Deal, error) {
 }
 
 // DeleteDeal deletes a deal.
-func (s *Service) DeleteDeal(ctx context.Context, clientID, dealID int) error {
+func (s *Service) DeleteDeal(ctx context.Context, dealID int) error {
 	// Verify deal exists
 	_, err := s.repo.GetDeal(ctx, dealID)
 	if err != nil {
@@ -56,67 +67,75 @@ func (s *Service) DeleteDeal(ctx context.Context, clientID, dealID int) error {
 
 // ListOrders retrieves a paginated list of orders for the client.
 func (s *Service) ListOrders(ctx context.Context, clientID int) ([]*domain.Order, int, error) {
+	if clientID <= 0 {
+		return nil, 0, fmt.Errorf("invalid client_id: %w", ErrInvalidInput)
+	}
 
 	orders, total, err := s.repo.ListOrders(ctx, clientID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list orders: %w", err)
 	}
 
-	// Verify client_id ownership
-	for _, order := range orders {
-		if order.ClientID != clientID {
-			return nil, 0, fmt.Errorf("unauthorized access to order %d: %w", order.OrderID, ErrUnauthorized)
-		}
-	}
-
 	return orders, total, nil
 }
 
-// CreateOrder creates a new order for the specified client.
-func (s *Service) CreateOrder(ctx context.Context, clientID int, req domain.OrderCreate) (*domain.Order, error) {
-	// Validate input
-	if req.Amount <= 0 {
-		return nil, fmt.Errorf("amount must be positive: %w", ErrInvalidInput)
-	}
-	if req.DealID <= 0 {
-		return nil, fmt.Errorf("invalid deal_id: %w", ErrInvalidInput)
-	}
-	if req.CounterpartyID <= 0 {
-		return nil, fmt.Errorf("invalid counterparty_id: %w", ErrInvalidInput)
-	}
-	if req.Status != "" && req.Status != domain.StatusPending && req.Status != domain.StatusExecuted && req.Status != domain.StatusCancelled {
-		return nil, fmt.Errorf("invalid status: %w", ErrInvalidInput)
+// CreateOrders creates new orders for the specified client.
+func (s *Service) CreateOrders(ctx context.Context, clientID int, req []domain.OrderCreate) ([]*domain.Order, error) {
+	if clientID <= 0 {
+		return nil, fmt.Errorf("invalid client_id: %w", ErrInvalidInput)
 	}
 
-	// Verify deal exists
-	_, err := s.repo.GetDeal(ctx, req.DealID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return nil, fmt.Errorf("deal not found: %w", ErrNotFound)
+	var createdOrders []*domain.Order
+	for _, orderReq := range req {
+		// Validate input
+		if orderReq.Amount <= 0 {
+			return nil, fmt.Errorf("amount must be positive: %w", ErrInvalidInput)
 		}
-		return nil, fmt.Errorf("failed to get deal: %w", err)
+		if orderReq.DealID <= 0 {
+			return nil, fmt.Errorf("invalid deal_id: %w", ErrInvalidInput)
+		}
+		if orderReq.OrderTypeID <= 0 {
+			return nil, fmt.Errorf("invalid order_type_id: %w", ErrInvalidInput)
+		}
+		if orderReq.BankID != nil && *orderReq.BankID <= 0 {
+			return nil, fmt.Errorf("invalid bank_id: %w", ErrInvalidInput)
+		}
+
+		// Verify deal exists
+		_, err := s.repo.GetDeal(ctx, orderReq.DealID)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, fmt.Errorf("deal not found: %w", ErrNotFound)
+			}
+			return nil, fmt.Errorf("failed to get deal: %w", err)
+		}
+
+		order := &domain.Order{
+			DealID:          orderReq.DealID,
+			OrderTypeID:     orderReq.OrderTypeID,
+			Amount:          orderReq.Amount,
+			Status:          domain.StatusPending, // Default status
+			NeedAndOrdersID: orderReq.NeedAndOrdersID,
+			BankID:          orderReq.BankID,
+		}
+
+		createdOrder, err := s.repo.CreateOrder(ctx, order)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create order: %w", err)
+		}
+		createdOrders = append(createdOrders, createdOrder)
 	}
 
-	order := &domain.Order{
-		DealID:          req.DealID,
-		Amount:          req.Amount,
-		Status:          req.Status,
-		ClientID:        clientID,
-		CounterpartyID:  req.CounterpartyID,
-		NeedAndOrdersID: req.NeedAndOrdersID,
-	}
-
-	createdOrder, err := s.repo.CreateOrder(ctx, order)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create order: %w", err)
-	}
-
-	return createdOrder, nil
+	return createdOrders, nil
 }
 
 // UpdateOrder updates an existing order.
 func (s *Service) UpdateOrder(ctx context.Context, clientID, orderID int, req domain.OrderCreate) (*domain.Order, error) {
-	// Fetch the order to verify existence and ownership
+	if clientID <= 0 {
+		return nil, fmt.Errorf("invalid client_id: %w", ErrInvalidInput)
+	}
+
+	// Fetch the order to verify existence
 	order, err := s.repo.GetOrder(ctx, orderID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -125,11 +144,6 @@ func (s *Service) UpdateOrder(ctx context.Context, clientID, orderID int, req do
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
 
-	// Verify client_id ownership
-	if order.ClientID != clientID {
-		return nil, fmt.Errorf("unauthorized access to order %d: %w", orderID, ErrUnauthorized)
-	}
-
 	// Validate input
 	if req.Amount <= 0 {
 		return nil, fmt.Errorf("amount must be positive: %w", ErrInvalidInput)
@@ -137,11 +151,11 @@ func (s *Service) UpdateOrder(ctx context.Context, clientID, orderID int, req do
 	if req.DealID <= 0 {
 		return nil, fmt.Errorf("invalid deal_id: %w", ErrInvalidInput)
 	}
-	if req.CounterpartyID <= 0 {
-		return nil, fmt.Errorf("invalid counterparty_id: %w", ErrInvalidInput)
+	if req.OrderTypeID <= 0 {
+		return nil, fmt.Errorf("invalid order_type_id: %w", ErrInvalidInput)
 	}
-	if req.Status != "" && req.Status != domain.StatusPending && req.Status != domain.StatusExecuted && req.Status != domain.StatusCancelled {
-		return nil, fmt.Errorf("invalid status: %w", ErrInvalidInput)
+	if req.BankID != nil && *req.BankID <= 0 {
+		return nil, fmt.Errorf("invalid bank_id: %w", ErrInvalidInput)
 	}
 
 	// Verify deal exists
@@ -155,10 +169,10 @@ func (s *Service) UpdateOrder(ctx context.Context, clientID, orderID int, req do
 
 	// Update order fields
 	order.DealID = req.DealID
+	order.OrderTypeID = req.OrderTypeID
 	order.Amount = req.Amount
-	order.Status = req.Status
-	order.CounterpartyID = req.CounterpartyID
 	order.NeedAndOrdersID = req.NeedAndOrdersID
+	order.BankID = req.BankID
 
 	updatedOrder, err := s.repo.UpdateOrder(ctx, order)
 	if err != nil {
@@ -171,48 +185,22 @@ func (s *Service) UpdateOrder(ctx context.Context, clientID, orderID int, req do
 	return updatedOrder, nil
 }
 
-// DeleteOrder deletes an order.
-func (s *Service) DeleteOrder(ctx context.Context, clientID, orderID int) error {
-	// Fetch the order to verify existence and ownership
-	order, err := s.repo.GetOrder(ctx, orderID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return fmt.Errorf("order not found: %w", ErrNotFound)
-		}
-		return fmt.Errorf("failed to get order: %w", err)
+// ListMonetarySettlements retrieves a paginated list of monetary settlements for the deal.
+func (s *Service) ListMonetarySettlements(ctx context.Context, dealID int) ([]*domain.MonetarySettlement, int, error) {
+	if dealID <= 0 {
+		return nil, 0, fmt.Errorf("invalid deal_id: %w", ErrInvalidInput)
 	}
 
-	// Verify client_id ownership
-	if order.ClientID != clientID {
-		return fmt.Errorf("unauthorized access to order %d: %w", orderID, ErrUnauthorized)
-	}
-
-	if err := s.repo.DeleteOrder(ctx, orderID); err != nil {
-		return fmt.Errorf("failed to delete order: %w", err)
-	}
-
-	return nil
-}
-
-// ListMonetarySettlements retrieves a paginated list of monetary settlements for the client.
-func (s *Service) ListMonetarySettlements(ctx context.Context, clientID int) ([]*domain.MonetarySettlement, int, error) {
-	settlements, total, err := s.repo.ListMonetarySettlements(ctx, clientID)
+	settlements, total, err := s.repo.ListMonetarySettlements(ctx, dealID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list monetary settlements: %w", err)
-	}
-
-	// Verify client_id ownership
-	for _, settlement := range settlements {
-		if settlement.ClientID != clientID {
-			return nil, 0, fmt.Errorf("unauthorized access to settlement %d: %w", settlement.MonetarySettlementID, ErrUnauthorized)
-		}
 	}
 
 	return settlements, total, nil
 }
 
-// CreateMonetarySettlement creates a new monetary settlement for the specified client.
-func (s *Service) CreateMonetarySettlement(ctx context.Context, clientID int, req domain.MonetarySettlementCreate) (*domain.MonetarySettlement, error) {
+// CreateMonetarySettlement creates a new monetary settlement.
+func (s *Service) CreateMonetarySettlement(ctx context.Context, req domain.MonetarySettlementCreate) (*domain.MonetarySettlement, error) {
 	// Validate input
 	if req.Amount <= 0 {
 		return nil, fmt.Errorf("amount must be positive: %w", ErrInvalidInput)
@@ -220,13 +208,8 @@ func (s *Service) CreateMonetarySettlement(ctx context.Context, clientID int, re
 	if req.DealID != nil && *req.DealID <= 0 {
 		return nil, fmt.Errorf("invalid deal_id: %w", ErrInvalidInput)
 	}
-	if req.Status != "" && req.Status != domain.StatusPending && req.Status != domain.StatusExecuted && req.Status != domain.StatusCancelled {
-		return nil, fmt.Errorf("invalid status: %w", ErrInvalidInput)
-	}
-	if req.PaymentMethod != nil {
-		if *req.PaymentMethod != domain.PaymentMethodCard && *req.PaymentMethod != domain.PaymentMethodBankTransfer && *req.PaymentMethod != domain.PaymentMethodWallet {
-			return nil, fmt.Errorf("invalid payment method: %w", ErrInvalidInput)
-		}
+	if req.BankID != nil && *req.BankID <= 0 {
+		return nil, fmt.Errorf("invalid bank_id: %w", ErrInvalidInput)
 	}
 
 	// Verify deal exists if provided
@@ -241,11 +224,10 @@ func (s *Service) CreateMonetarySettlement(ctx context.Context, clientID int, re
 	}
 
 	settlement := &domain.MonetarySettlement{
-		DealID:        req.DealID,
-		Amount:        req.Amount,
-		Status:        req.Status,
-		PaymentMethod: req.PaymentMethod,
-		ClientID:      clientID,
+		DealID: req.DealID,
+		Amount: req.Amount,
+		Status: domain.StatusPending, // Default status
+		BankID: req.BankID,
 	}
 
 	createdSettlement, err := s.repo.CreateMonetarySettlement(ctx, settlement)
@@ -254,40 +236,4 @@ func (s *Service) CreateMonetarySettlement(ctx context.Context, clientID int, re
 	}
 
 	return createdSettlement, nil
-}
-
-// ListClearingTransactions retrieves a paginated list of clearing transactions for the client.
-func (s *Service) ListClearingTransactions(ctx context.Context, clientID, page, limit int) ([]*domain.ClearingTransaction, int, error) {
-	if page < 1 || limit < 1 {
-		return nil, 0, fmt.Errorf("invalid pagination parameters: %w", ErrInvalidInput)
-	}
-
-	transactions, total, err := s.repo.ListClearingTransactions(ctx, clientID)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to list clearing transactions: %w", err)
-	}
-
-	// Verify client_id ownership indirectly through related orders or settlements
-	for _, tx := range transactions {
-		if tx.OrderID != nil {
-			order, err := s.repo.GetOrder(ctx, *tx.OrderID)
-			if err != nil {
-				return nil, 0, fmt.Errorf("failed to get order %d: %w", *tx.OrderID, err)
-			}
-			if order.ClientID != clientID {
-				return nil, 0, fmt.Errorf("unauthorized access to transaction %d: %w", tx.ClearingTransactionID, ErrUnauthorized)
-			}
-		}
-		if tx.MonetarySettlementID != nil {
-			settlement, err := s.repo.GetMonetarySettlement(ctx, *tx.MonetarySettlementID)
-			if err != nil {
-				return nil, 0, fmt.Errorf("failed to get settlement %d: %w", *tx.MonetarySettlementID, err)
-			}
-			if settlement.ClientID != clientID {
-				return nil, 0, fmt.Errorf("unauthorized access to transaction %d: %w", tx.ClearingTransactionID, ErrUnauthorized)
-			}
-		}
-	}
-
-	return transactions, total, nil
 }

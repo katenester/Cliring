@@ -1,143 +1,109 @@
--- Создание таблицы deals
-CREATE TABLE deals (
-                       deal_id INTEGER PRIMARY KEY NOT NULL,
-                       is_completed BOOLEAN,
-                       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+create table if not exists clients (
+                                       client_id  integer primary key,
+                                       name       varchar(100) not null,
+    inn        varchar(100),
+    created_at timestamp with time zone default CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone default CURRENT_TIMESTAMP
+                             );
+
+comment on table clients is 'Таблица для хранения информации о клиентах';
+comment on column clients.client_id is 'Уникальный идентификатор клиента';
+comment on column clients.name is 'Имя клиента';
+comment on column clients.inn is 'ИНН';
+comment on column clients.created_at is 'Дата и время создания';
+comment on column clients.updated_at is 'Дата и время последнего обновления';
+
+create table if not exists order_types (
+                                           order_type_id integer primary key,
+                                           name          varchar(20) not null unique
+    );
+
+comment on table order_types is 'Таблица для хранения типов заказов';
+comment on column order_types.order_type_id is 'Уникальный идентификатор типа заказа';
+comment on column order_types.name is 'Название типа заказа (Покупка, Кредит, Трейд-ин)';
+
+create table if not exists deals (
+                                     deal_id       integer primary key,
+                                     is_completed  boolean default false,
+                                     created_at    timestamp with time zone default CURRENT_TIMESTAMP,
+                                     updated_at    timestamp with time zone default CURRENT_TIMESTAMP,
+                                     dealership_id integer,
+                                     manager_id    integer,
+                                     client_id     integer references clients
 );
 
-COMMENT ON TABLE deals IS 'Таблица для хранения сделок';
-COMMENT ON COLUMN deals.deal_id IS 'Уникальный идентификатор сделки';
-COMMENT ON COLUMN deals.is_completed IS 'Флаг завершения сделки';
-COMMENT ON COLUMN deals.created_at IS 'Дата и время создания';
-COMMENT ON COLUMN deals.updated_at IS 'Дата и время последнего обновления';
+comment on table deals is 'Таблица для хранения сделок';
+comment on column deals.deal_id is 'Уникальный идентификатор сделки';
+comment on column deals.is_completed is 'Флаг завершения сделки';
+comment on column deals.created_at is 'Дата и время создания';
+comment on column deals.updated_at is 'Дата и время последнего обновления';
+comment on column deals.dealership_id is 'Идентификатор дилерского центра';
+comment on column deals.manager_id is 'Идентификатор менеджера';
+comment on column deals.client_id is 'Идентификатор клиента';
 
--- Создание таблицы orders
-CREATE TABLE orders (
-                        order_id INTEGER PRIMARY KEY NOT NULL,
-                        deal_id INTEGER NOT NULL,
-                        amount NUMERIC(15,2) NOT NULL,
-                        status CHARACTER VARYING(20) DEFAULT 'pending',
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                        client_id INTEGER,
-                        "counterparty-id" INTEGER,
-                        need_and_orders_id INTEGER,
-                        FOREIGN KEY (deal_id) REFERENCES deals (deal_id)
-                            MATCH SIMPLE ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+create index if not exists idx_deals_client_id on deals (client_id);
 
-COMMENT ON TABLE orders IS 'Таблица для хранения взаиморасчетов типа "Заказ"';
-COMMENT ON COLUMN orders.order_id IS 'Уникальный идентификатор заказа';
-COMMENT ON COLUMN orders.deal_id IS 'Ссылка на сделку';
-COMMENT ON COLUMN orders.amount IS 'Сумма заказа';
-COMMENT ON COLUMN orders.status IS 'Текущий статус заказа (pending, executed, cancelled)';
-COMMENT ON COLUMN orders.created_at IS 'Дата и время создания заказа';
-COMMENT ON COLUMN orders.updated_at IS 'Дата и время последнего обновления заказа';
-COMMENT ON COLUMN orders.client_id IS 'Клиент-кредитор';
-COMMENT ON COLUMN orders."counterparty-id" IS 'Клиент-кредитор';
-COMMENT ON COLUMN orders.need_and_orders_id IS 'ID потребности, заказа (сервис Need and Orders)';
+create table if not exists bank (
+                                    bank_id   integer primary key,
+                                    bank_name varchar(50) not null
+    );
 
--- Создание таблицы monetary_settlements
-CREATE TABLE monetary_settlements (
-                                      monetary_settlement_id INTEGER PRIMARY KEY NOT NULL,
-                                      deal_id INTEGER,
-                                      amount NUMERIC(15,2) NOT NULL,
-                                      status CHARACTER VARYING(20) DEFAULT 'pending',
-                                      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                      payment_method CHARACTER VARYING(50),
-                                      client_id INTEGER,
-                                      FOREIGN KEY (deal_id) REFERENCES deals (deal_id)
-                                          MATCH SIMPLE ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+create table if not exists orders (
+                                      order_id           integer primary key,
+                                      deal_id            integer not null references deals,
+                                      order_type_id      integer not null references order_types,
+                                      amount             numeric(15, 2) not null check (amount > 0),
+    status             varchar(20) default 'pending' check (status in ('pending', 'executed', 'cancelled')),
+    created_at         timestamp with time zone default CURRENT_TIMESTAMP,
+    updated_at         timestamp with time zone default CURRENT_TIMESTAMP,
+                                     need_and_orders_id integer,
+                                     bank_id            integer references bank
+                                     );
 
-COMMENT ON TABLE monetary_settlements IS 'Таблица для хранения взаиморасчетов типа "Денежный платеж"';
-COMMENT ON COLUMN monetary_settlements.monetary_settlement_id IS 'Уникальный идентификатор денежного взаиморасчета';
-COMMENT ON COLUMN monetary_settlements.deal_id IS 'Ссылка на сделку';
-COMMENT ON COLUMN monetary_settlements.amount IS 'Сумма взаиморасчета';
-COMMENT ON COLUMN monetary_settlements.status IS 'Текущий статус (pending, executed, cancelled)';
-COMMENT ON COLUMN monetary_settlements.created_at IS 'Дата и время создания';
-COMMENT ON COLUMN monetary_settlements.updated_at IS 'Дата и время последнего обновления';
-COMMENT ON COLUMN monetary_settlements.payment_method IS 'Метод оплаты';
-COMMENT ON COLUMN monetary_settlements.client_id IS 'Клиент';
+comment on table orders is 'Таблица для хранения заказов';
+comment on column orders.order_id is 'Уникальный идентификатор заказа';
+comment on column orders.deal_id is 'Идентификатор сделки';
+comment on column orders.order_type_id is 'Идентификатор типа заказа (ссылка на order_types)';
+comment on column orders.amount is 'Сумма заказа';
+comment on column orders.status is 'Статус заказа: pending, executed, cancelled';
+comment on column orders.created_at is 'Дата и время создания';
+comment on column orders.updated_at is 'Дата и время последнего обновления';
+comment on column orders.need_and_orders_id is 'Идентификатор потребности или заказа из сервиса Need and Orders';
+comment on column orders.bank_id is 'Идентификатор банка';
 
--- Создание таблицы clearing_transactions
-CREATE TABLE clearing_transactions (
-                                       clearing_transaction_id INTEGER PRIMARY KEY NOT NULL,
-                                       order_id INTEGER,
-                                       monetary_settlement_id INTEGER,
-                                       amount NUMERIC(15,2) NOT NULL,
-                                       status CHARACTER VARYING(20) DEFAULT 'pending',
-                                       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                       FOREIGN KEY (monetary_settlement_id) REFERENCES monetary_settlements (monetary_settlement_id)
-                                           MATCH SIMPLE ON UPDATE NO ACTION ON DELETE NO ACTION,
-                                       FOREIGN KEY (order_id) REFERENCES orders (order_id)
-                                           MATCH SIMPLE ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+create index if not exists idx_orders_deal_id on orders (deal_id);
+create index if not exists idx_orders_order_type_id on orders (order_type_id);
+create index if not exists idx_orders_bank_id on orders (bank_id);
 
-COMMENT ON TABLE clearing_transactions IS 'Таблица для хранения клиринговых транзакций';
-COMMENT ON COLUMN clearing_transactions.clearing_transaction_id IS 'Уникальный идентификатор клиринговой транзакции';
-COMMENT ON COLUMN clearing_transactions.order_id IS 'Ссылка на заказ (опционально)';
-COMMENT ON COLUMN clearing_transactions.monetary_settlement_id IS 'Ссылка на денежный взаиморасчет (опционально)';
-COMMENT ON COLUMN clearing_transactions.amount IS 'Сумма транзакции';
-COMMENT ON COLUMN clearing_transactions.status IS 'Статус: pending, completed';
-COMMENT ON COLUMN clearing_transactions.created_at IS 'Дата и время создания';
-COMMENT ON COLUMN clearing_transactions.updated_at IS 'Дата и время последнего обновления';
+create table if not exists monetary_settlements (
+                                                    monetary_settlement_id integer primary key,
+                                                    deal_id                integer not null references deals,
+                                                    amount                 numeric(15, 2) not null check (amount > 0),
+    status                 varchar(20) default 'pending' check (status in ('pending', 'executed', 'cancelled')),
+    created_at             timestamp with time zone default CURRENT_TIMESTAMP,
+    updated_at             timestamp with time zone default CURRENT_TIMESTAMP,
+                                         bank_id                integer references bank
+                                         );
 
--- Создание таблицы pay_transactions
-CREATE TABLE pay_transactions (
-                                  transaction_id INTEGER PRIMARY KEY NOT NULL,
-                                  monetary_settlement_id INTEGER NOT NULL,
-                                  amount NUMERIC(15,2) NOT NULL,
-                                  bank_account CHARACTER VARYING(100) NOT NULL,
-                                  payment_method CHARACTER VARYING(50) NOT NULL,
-                                  status CHARACTER VARYING(20) DEFAULT 'pending',
-                                  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                  FOREIGN KEY (monetary_settlement_id) REFERENCES monetary_settlements (monetary_settlement_id)
-                                      MATCH SIMPLE ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+comment on table monetary_settlements is 'Таблица для хранения денежных взаиморасчетов';
+comment on column monetary_settlements.monetary_settlement_id is 'Уникальный идентификатор денежного взаиморасчета';
+comment on column monetary_settlements.deal_id is 'Идентификатор сделки';
+comment on column monetary_settlements.amount is 'Сумма взаиморасчета';
+comment on column monetary_settlements.status is 'Статус: pending, executed, cancelled';
+comment on column monetary_settlements.created_at is 'Дата и время создания';
+comment on column monetary_settlements.updated_at is 'Дата и время последнего обновления';
+comment on column monetary_settlements.bank_id is 'Идентификатор банка';
 
-COMMENT ON TABLE pay_transactions IS 'Таблица для хранения денежных транзакций в модуле Клиринга';
-COMMENT ON COLUMN pay_transactions.transaction_id IS 'Уникальный идентификатор транзакции';
-COMMENT ON COLUMN pay_transactions.monetary_settlement_id IS 'Ссылка на денежный взаиморасчет';
-COMMENT ON COLUMN pay_transactions.amount IS 'Сумма транзакции';
-COMMENT ON COLUMN pay_transactions.bank_account IS 'Банковский счет для транзакции';
-COMMENT ON COLUMN pay_transactions.payment_method IS 'Метод оплаты';
-COMMENT ON COLUMN pay_transactions.status IS 'Текущий статус (pending, completed, cancelled)';
-COMMENT ON COLUMN pay_transactions.created_at IS 'Дата и время создания';
-COMMENT ON COLUMN pay_transactions.updated_at IS 'Дата и время последнего обновления';
+create index if not exists idx_monetary_settlements_deal_id on monetary_settlements (deal_id);
+create index if not exists idx_monetary_settlements_bank_id on monetary_settlements (bank_id);
 
--- Создание таблицы payment_schedules
-CREATE TABLE payment_schedules (
-                                   schedule_id INTEGER PRIMARY KEY NOT NULL,
-                                   monetary_settlement_id INTEGER NOT NULL,
-                                   due_date DATE NOT NULL,
-                                   amount NUMERIC(15,2) NOT NULL,
-                                   status CHARACTER VARYING(20) DEFAULT 'planned',
-                                   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                   FOREIGN KEY (monetary_settlement_id) REFERENCES monetary_settlements (monetary_settlement_id)
-                                       MATCH SIMPLE ON UPDATE NO ACTION ON DELETE NO ACTION
-);
-
-COMMENT ON TABLE payment_schedules IS 'Таблица для управления графиками платежей';
-COMMENT ON COLUMN payment_schedules.schedule_id IS 'Уникальный идентификатор записи в графике';
-COMMENT ON COLUMN payment_schedules.monetary_settlement_id IS 'Ссылка на денежный взаиморасчет';
-COMMENT ON COLUMN payment_schedules.due_date IS 'Дата платежа';
-COMMENT ON COLUMN payment_schedules.amount IS 'Сумма платежа';
-COMMENT ON COLUMN payment_schedules.status IS 'Статус: planned, paid, overdue';
-COMMENT ON COLUMN payment_schedules.created_at IS 'Дата и время создания';
-COMMENT ON COLUMN payment_schedules.updated_at IS 'Дата и время последнего обновления';
 
 ---- create above / drop below ----
 
 -- Откат: удаление таблиц в обратном порядке
-DROP TABLE payment_schedules;
-DROP TABLE pay_transactions;
-DROP TABLE clearing_transactions;
-DROP TABLE monetary_settlements;
-DROP TABLE orders;
-DROP TABLE deals;
+drop table if exists monetary_settlements cascade;
+drop table if exists orders cascade;
+drop table if exists bank cascade;
+drop table if exists deals cascade;
+drop table if exists order_types cascade;
+drop table if exists clients cascade;
