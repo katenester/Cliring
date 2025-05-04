@@ -22,6 +22,10 @@ comment on table order_types is 'Таблица для хранения типо
 comment on column order_types.order_type_id is 'Уникальный идентификатор типа заказа';
 comment on column order_types.name is 'Название типа заказа (Покупка, Кредит, Трейд-ин)';
 
+INSERT INTO order_types(order_type_id, name) values (1,'ПОКУПКА');
+INSERT INTO order_types(order_type_id, name) values (2,'КРЕДИТ');
+INSERT INTO order_types(order_type_id, name) values (3,'ТРЕЙД-ИН');
+
 create table if not exists deals (
                                      deal_id       integer primary key,
                                      is_completed  boolean default false,
@@ -49,7 +53,7 @@ create table if not exists bank (
     );
 
 create table if not exists orders (
-                                      order_id           integer primary key,
+                                      order_id           serial primary key,
                                       deal_id            integer not null references deals,
                                       order_type_id      integer not null references order_types,
                                       amount             numeric(15, 2) not null check (amount > 0),

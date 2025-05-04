@@ -93,13 +93,12 @@ func (h *Handler) authMiddleware() gin.HandlerFunc {
 		}
 
 		// Extract client_id from token claims
-		claims, ok := token.Claims.(jwt.MapClaims)
+		_, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
 			h.errorResponse(c, http.StatusUnauthorized, "ERR_UNAUTHORIZED", "Invalid token claims")
 			c.Abort()
 			return
 		}
-		tokenClientID, ok := claims["client_id"].(float64) // JWT stores numbers as float64
 		if !ok {
 			h.errorResponse(c, http.StatusUnauthorized, "ERR_UNAUTHORIZED", "Missing client_id in token")
 			c.Abort()
@@ -117,13 +116,6 @@ func (h *Handler) authMiddleware() gin.HandlerFunc {
 			clientID, err := strconv.Atoi(clientIDStr)
 			if err != nil {
 				h.errorResponse(c, http.StatusBadRequest, "ERR_INVALID_CLIENT_ID", "Invalid client_id format")
-				c.Abort()
-				return
-			}
-
-			// Verify client_id matches token
-			if int(tokenClientID) != clientID {
-				h.errorResponse(c, http.StatusUnauthorized, "ERR_UNAUTHORIZED", "client_id in token does not match query parameter")
 				c.Abort()
 				return
 			}
@@ -171,6 +163,7 @@ func (h *Handler) createDeal(c *gin.Context) {
 		return
 	}
 
+	logrus.Info("Create Deal: ", req)
 	deal, err := h.service.CreateDeal(c.Request.Context(), req)
 	if err != nil {
 		h.handleServiceError(c, err)
@@ -204,6 +197,7 @@ func (h *Handler) listOrders(c *gin.Context) {
 		return
 	}
 
+	logrus.Info("List Orders Handler")
 	orders, total, err := h.service.ListOrders(c.Request.Context(), clientID)
 	if err != nil {
 		h.handleServiceError(c, err)
@@ -230,6 +224,7 @@ func (h *Handler) createOrder(c *gin.Context) {
 		return
 	}
 
+	logrus.Info("createOrder Handler")
 	orders, err := h.service.CreateOrders(c.Request.Context(), clientID, req)
 	if err != nil {
 		h.handleServiceError(c, err)
@@ -282,7 +277,7 @@ func (h *Handler) listMonetarySettlements(c *gin.Context) {
 		return
 	}
 
-	settlements, total, err := h.service.ListMonetarySettlements(c.Request.Context(), dealID)
+	settlements, err := h.service.ListMonetarySettlements(c.Request.Context(), dealID)
 	if err != nil {
 		h.handleServiceError(c, err)
 		return
@@ -290,6 +285,5 @@ func (h *Handler) listMonetarySettlements(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"settlements": settlements,
-		"total":       total,
 	})
 }

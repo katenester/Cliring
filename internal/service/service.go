@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"time"
 
 	"cliring/internal/domain"
@@ -72,6 +73,7 @@ func (s *Service) ListOrders(ctx context.Context, clientID int) ([]*domain.Order
 		return nil, 0, fmt.Errorf("invalid client_id: %w", ErrInvalidInput)
 	}
 
+	logrus.Info("List Orders Service")
 	orders, total, err := s.repo.ListOrders(ctx, clientID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list orders: %w", err)
